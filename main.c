@@ -4,8 +4,12 @@
 #include <semaphore.h>
 #include <time.h>
 
-#define MAX_READ_TIME 10;
-#define MAX_WRITE_TIME 6;
+#define WRITER_STARVATION 0
+#define READER_STARVATION 1
+#define NO_STARVATION 2
+
+#define MAX_READ_TIME 10
+#define MAX_WRITE_TIME 6
 
 const char READER_NAME[] = "Reader";
 const char WRITER_NAME[] = "Writer";
@@ -90,22 +94,15 @@ void *reader(void* arg)
     pthread_mutex_unlock(&mutex);
 }
 
-int main(int argc, char* argv[])
+void writer_starvation()
 {
-    if(argc == 3)
-    {
-        readerQueue = atoi(argv[1]);
-        writerQueue = atoi(argv[2]);
-    }
-
     int totalCount = readerQueue + writerQueue;
     int readerCount = readerQueue;
     int writerCount = writerQueue;
 
     pthread_t threads[totalCount];
-    int i;
-    srand(time(NULL));
 
+    int i;  
     if (pthread_mutex_init(&mutex, NULL) != 0)
         return 1;
     if (sem_init(&semaphore, 0, 1) != 0)
@@ -138,5 +135,32 @@ int main(int argc, char* argv[])
     }
     pthread_mutex_destroy(&mutex);
     sem_destroy(&semaphore);
+}
+
+int main(int argc, char* argv[])
+{
+    int variant = WRITER_STARVATION;
+    if(argc == 4)
+    {
+        readerQueue = atoi(argv[1]);
+        writerQueue = atoi(argv[2]);
+        variant = atoi(argv[3]);
+    }
+    srand(time(NULL));
+    
+    switch(variant)
+    {
+        case WRITER_STARVATION:
+            writer_starvation();
+            break;
+        case READER_STARVATION:
+            printf("No implemented yet :/\n");
+            break;
+        case NO_STARVATION:
+            printf("No implemented yet :/\n");
+            break;
+        default:
+            printf("This variant does not exist :(\n");
+    }
     return 0;
 }
