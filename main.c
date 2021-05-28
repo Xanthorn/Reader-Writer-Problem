@@ -12,9 +12,9 @@ const char WRITER_NAME[] = "Writer";
 const char ARRIVAL_NAME[] = "comes in";
 const char DEPARTURE_NAME[] ="leaves";
 
+volatile int readerQueue = 15;
+volatile int writerQueue = 4;
 
-const int readerCount = 15;
-const int writerCount = 4;
 volatile int readersIn = 0;
 volatile int writersIn = 0;
 pthread_mutex_t mutex;
@@ -22,7 +22,7 @@ sem_t semaphore;
 
 void print_stats()
 {
-    printf("ReaderQ: %-2d WriterQ: %-2d [in: R:%-2d W:%-2d] ", readerCount - readersIn, writerCount - writersIn, readersIn, writersIn);
+    printf("ReaderQ: %-2d WriterQ: %-2d [in: R:%-2d W:%-2d] ", readerQueue, writerQueue, readersIn, writersIn);
     fflush(stdout);
 }
 
@@ -40,6 +40,7 @@ void *writer(void* arg)
     //block semaphore
     sem_wait(&semaphore);
     writersIn++;
+    writerQueue--;
     print_stats();
     print_change(id, WRITER_NAME, ARRIVAL_NAME);
 
@@ -61,7 +62,7 @@ void *reader(void* arg)
     //lock before incrementing readersIn;
     pthread_mutex_lock(&mutex);
     readersIn++;
-
+    readerQueue--;
     //block writer access when reader come in
     if(readersIn == 1)
         sem_wait(&semaphore);
@@ -91,7 +92,16 @@ void *reader(void* arg)
 
 int main(int argc, char* argv[])
 {
-    int totalCount = readerCount + writerCount;
+    if(argc == 3)
+    {
+        readerQueue = atoi(argv[1]);
+        writerQueue = atoi(argv[2]);
+    }
+
+    int totalCount = readerQueue + writerQueue;
+    int readerCount = readerQueue;
+    int writerCount = writerQueue;
+
     pthread_t threads[totalCount];
     int i;
     srand(time(NULL));
