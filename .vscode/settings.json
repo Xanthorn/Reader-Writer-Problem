@@ -8,6 +8,11 @@
             "cwd": "",
             "binaryPath": "",
             "binaryArgs": []
+        },
+        {
+            "cwd": "/home/ubuntu/repos/Reader-Writer-Problem/bin",
+            "binaryPath": "/home/ubuntu/repos/Reader-Writer-Problem/bin/main",
+            "binaryArgs": []
         }
     ]
 }
