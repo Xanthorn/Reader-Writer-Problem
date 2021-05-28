@@ -36,6 +36,7 @@ void print_change(int id, char name[], char action[])
     fflush(stdout);
 }
 
+#pragma region writer_starvation
 void *writer(void* arg)
 {
     int id = *(int *)arg;
@@ -136,6 +137,7 @@ void writer_starvation()
     pthread_mutex_destroy(&mutex);
     sem_destroy(&semaphore);
 }
+#pragma endregion writer_starvation
 
 int main(int argc, char* argv[])
 {
