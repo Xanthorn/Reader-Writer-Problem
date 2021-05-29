@@ -23,6 +23,8 @@ volatile int readersIn = 0;
 volatile int writersIn = 0;
 pthread_mutex_t mutex;
 sem_t semaphore;
+pthread_cond_t canRead;
+pthread_cond_t canWrite;
 
 void print_stats()
 {
@@ -139,6 +141,179 @@ void writer_starvation()
 }
 #pragma endregion writer_starvation
 
+
+
+#pragma region no_starvation
+// initializes conditional variables and mutex
+void ns_init()
+{
+    pthread_cond_init(&canRead, NULL);
+    pthread_cond_init(&canWrite, NULL);
+    pthread_mutex_init(&mutex, NULL);
+}
+
+// signals that a reader wants to access library, which he does upon signal from other thread on canRead variable
+void ns_start_reading(int id)
+{
+    pthread_mutex_lock(&mutex);
+
+    // wait if writers are in or waiting
+    if (writersIn == 1 || writerQueue > 0)
+    {
+        pthread_cond_wait(&canRead, &mutex);
+    }
+
+    // start reading and broadcast that reading is available
+    readerQueue--;
+    readersIn++;
+    print_stats();
+    print_change(id, READER_NAME, ARRIVAL_NAME);
+    pthread_mutex_unlock(&mutex);
+    pthread_cond_broadcast(&canRead);
+}
+
+// signals that a reader is leaving, which means a writer can enter (only if no readers reside)
+void ns_stop_reading(int id)
+{
+    pthread_mutex_lock(&mutex);
+    readersIn--;
+    // if this is the last reader, signal that a writer can enter
+    if (readersIn == 0)
+    {
+        pthread_cond_signal(&canWrite);
+    }
+
+    // print departure message
+    print_stats();
+    print_change(id, READER_NAME, DEPARTURE_NAME);
+    pthread_mutex_unlock(&mutex);
+}
+
+// signals that a writer wants to access library, which he does upon signal from other thread on canWrite variable
+void ns_start_writing(int id)
+{
+    pthread_mutex_lock(&mutex);
+
+    // wait if a writer is in or readers are waiting
+    if (writersIn == 1 || readersIn > 0)
+    {
+        pthread_cond_wait(&canWrite, &mutex);
+    }
+
+    // start writing and print arrival message
+    writerQueue--;
+    writersIn = 1;
+    print_stats();
+    print_change(id, WRITER_NAME, ARRIVAL_NAME);
+    pthread_mutex_unlock(&mutex);
+}
+
+// signals that a writer is leaving, which means a reader/writer can enter
+void ns_stop_writing(int id)
+{
+    pthread_mutex_lock(&mutex);
+    writersIn = 0;
+
+    // if no readers are waiting, signal a writer to enter, else signal reader
+    if (readerQueue == 0)
+    {
+        pthread_cond_signal(&canWrite);
+    }
+    else
+    {
+        pthread_cond_signal(&canRead);
+    }
+
+    // print departure message
+    print_stats();
+    print_change(id, WRITER_NAME, DEPARTURE_NAME);
+    pthread_mutex_unlock(&mutex);
+}
+
+// execute reading procedure
+void *ns_reader(void* arg)
+{
+    int id = *(int*)arg;
+    int sleepTime = rand() % MAX_READ_TIME + 1;
+    sleep(1);
+    ns_start_reading(id);
+    
+    // simulate reading
+    sleep(sleepTime);
+    
+    ns_stop_reading(id);
+}
+
+// execute writing procedure
+void *ns_writer(void* arg)
+{
+    int id = *(int*)arg;
+    int sleepTime = rand() % MAX_WRITE_TIME + 1;
+    sleep(1);
+    ns_start_writing(id);
+
+    // simulate writing
+    sleep(sleepTime);
+
+    ns_stop_writing(id);
+}
+
+void no_starvation()
+{
+    int totalCount = readerQueue + writerQueue;
+    int readerCount = readerQueue;
+    int writerCount = writerQueue;
+    int readerIterator;
+    int writerIterator;
+    int i;
+    pthread_t threads[totalCount];
+
+    ns_init();
+
+    print_stats();
+    printf("\n");
+    fflush(stdout);
+    readerIterator = 0;
+    writerIterator = 0;
+    i = 0;
+
+    // create reader and writer threads
+    while(readerIterator + writerIterator < totalCount)
+    {
+        int *id;
+
+        if (readerIterator < readerCount)
+        {
+            id = malloc(sizeof(int));
+            *id = i++;
+            readerIterator++;
+            pthread_create(&threads[*id], NULL, ns_reader, (void*) id);
+
+            //simulate time to enter
+            sleep(1);
+        }
+
+        if (writerIterator < writerCount)
+        {
+            id = malloc(sizeof(int));
+            *id = i++;
+            writerIterator++;
+            pthread_create(&threads[*id], NULL, ns_writer, (void*) id);
+            
+            //simulate time to enter
+            sleep(1);
+        }
+    }
+
+    for(i = 0; i < totalCount; i++)
+    {
+        pthread_join(threads[i], NULL);
+    }
+    pthread_mutex_destroy(&mutex);
+}
+#pragma endregion no_starvation
+
+
 int main(int argc, char* argv[])
 {
     int variant = WRITER_STARVATION;
@@ -159,7 +334,7 @@ int main(int argc, char* argv[])
             printf("No implemented yet :/\n");
             break;
         case NO_STARVATION:
-            printf("No implemented yet :/\n");
+            no_starvation();
             break;
         default:
             printf("This variant does not exist :(\n");
