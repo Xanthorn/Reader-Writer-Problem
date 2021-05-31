@@ -141,7 +141,128 @@ void writer_starvation()
 }
 #pragma endregion writer_starvation
 
+#pragma region reader_starvation
 
+
+void *rs_reader(void* arg)
+{
+    int id = *(int *)arg;
+    int sleepTime = rand() % MAX_READ_TIME + 1;
+    
+    pthread_mutex_lock(&mutex);
+
+    // wait if a writer is in or are still writers in the queue
+    if(writersIn == 1 || writerQueue > 0)
+        pthread_cond_wait(&canRead, &mutex);
+    
+    // start reading and print arrival message
+    readersIn++;
+    readerQueue--;
+    print_stats();
+    print_change(id, READER_NAME, ARRIVAL_NAME);
+
+    pthread_mutex_unlock(&mutex);
+
+
+    //simulate work
+    sleep(sleepTime);
+
+
+    pthread_mutex_lock(&mutex);
+
+    // end reading and print departure message
+    readersIn--;
+    print_stats();
+    print_change(id, READER_NAME, DEPARTURE_NAME);
+    pthread_mutex_unlock(&mutex);
+    // if any writers are waiting and library is empty then send a signal to waiting writer
+    if(writerQueue > 0 && readersIn == 0)
+        pthread_cond_signal(&canWrite);
+}
+
+void *rs_writer(void* arg)
+{
+    int id = *(int *)arg;
+    int sleepTime = rand() % MAX_WRITE_TIME + 1;
+    
+    pthread_mutex_lock(&mutex);
+
+    // wait if there is another writer in the library or if there is a reader in the library
+    if(writersIn == 1 || readersIn > 0)
+        pthread_cond_wait(&canWrite, &mutex);
+
+    // start writing and print arrival message
+    writersIn++;
+    writerQueue--;
+    print_stats();
+    print_change(id, WRITER_NAME, ARRIVAL_NAME);
+
+    pthread_mutex_unlock(&mutex);    
+
+
+    //simulate work
+    sleep(sleepTime);
+
+
+    // end writing and print departure message
+    pthread_mutex_lock(&mutex);
+    writersIn--;
+    print_stats();
+    print_change(id, WRITER_NAME, DEPARTURE_NAME);
+    pthread_mutex_unlock(&mutex);
+    // if any writers are still waiting and library is empty then send signal to waiting writer
+    if(writerQueue > 0 && writersIn == 0)
+        pthread_cond_signal(&canWrite);
+    // else send broadcast to all waiting readers
+    else
+        pthread_cond_broadcast(&canRead);
+}
+
+void reader_starvation()
+{
+    int totalCount = readerQueue + writerQueue;
+    int readerCount = readerQueue;
+    int writerCount = writerQueue;
+
+    pthread_t threads[totalCount];
+    int i;  
+    if (pthread_mutex_init(&mutex, NULL) != 0)
+        return 1;
+    if (pthread_cond_init(&canRead, NULL))
+        return 2;
+    if (pthread_cond_init(&canWrite, NULL))
+        return 3;
+    
+    print_stats();
+    printf("\n");
+    fflush(stdout);
+    for(i = 0; i < totalCount; i++)
+    {
+        int *id = malloc(sizeof(int));
+        if(i < readerCount)
+        {
+            *id = i;
+            pthread_create(&threads[i], NULL, rs_reader, (void*) id);
+        }
+        else
+        {
+            *id = i - readerCount;
+            pthread_create(&threads[i], NULL, rs_writer, (void*) id);
+        }
+
+        //simulate time to enter
+        sleep(1);
+    }
+    for(i = 0; i < totalCount; i++)
+    {
+        pthread_join(threads[i], NULL);
+    }
+    pthread_mutex_destroy(&mutex);
+    pthread_cond_destroy(&canWrite);
+    pthread_cond_destroy(&canRead);
+}
+
+#pragma endregion reader_starvation
 
 #pragma region no_starvation
 // initializes conditional variables and mutex
@@ -310,13 +431,14 @@ void no_starvation()
         pthread_join(threads[i], NULL);
     }
     pthread_mutex_destroy(&mutex);
+    pthread_cond_destroy(&canWrite);
+    pthread_cond_destroy(&canRead);
 }
 #pragma endregion no_starvation
 
-
 int main(int argc, char* argv[])
 {
-    int variant = WRITER_STARVATION;
+    int variant = READER_STARVATION;
     if(argc == 4)
     {
         readerQueue = atoi(argv[1]);
@@ -331,7 +453,7 @@ int main(int argc, char* argv[])
             writer_starvation();
             break;
         case READER_STARVATION:
-            printf("No implemented yet :/\n");
+            reader_starvation();
             break;
         case NO_STARVATION:
             no_starvation();
