@@ -188,6 +188,10 @@ void *rs_reader(void* arg)
     // if any writers are waiting and library is empty then send a signal to waiting writer
     if(writerQueue > 0 && readersIn == 0)
         pthread_cond_signal(&canWrite);
+
+    sleep(sleepTime);
+    readerQueue++;
+    rs_reader(arg);
 }
 
 void *rs_writer(void* arg)
@@ -226,6 +230,10 @@ void *rs_writer(void* arg)
     // else send broadcast to all waiting readers
     else
         pthread_cond_broadcast(&canRead);
+
+    sleep(sleepTime);
+    writerQueue++;
+    rs_writer(arg);
 }
 
 void reader_starvation()
