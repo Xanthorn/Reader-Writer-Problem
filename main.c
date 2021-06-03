@@ -55,10 +55,15 @@ void *writer(void* arg)
     sleep(sleepTime);
 
     writersIn--;
+    writerQueue++;
     print_stats();
     print_change(id, WRITER_NAME, DEPARTURE_NAME);
     //unlock semaphore when finished
     sem_post(&semaphore);
+
+    //simulate waiting before coming again
+    sleep(sleepTime);
+    writer(arg);
 }
 
 void *reader(void* arg)
@@ -86,6 +91,7 @@ void *reader(void* arg)
     //lock before decrementing readersIN;
     pthread_mutex_lock(&mutex);
     readersIn--;
+    readerQueue++;
     //unlock semaphore when the last reader leaves
     if(readersIn == 0)
         sem_post(&semaphore);
@@ -95,6 +101,10 @@ void *reader(void* arg)
     
     //unlock mutex when finished
     pthread_mutex_unlock(&mutex);
+
+    //simulate waiting before coming again
+    sleep(sleepTime);
+    reader(arg);
 }
 
 void writer_starvation()
