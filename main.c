@@ -287,6 +287,9 @@ void ns_init()
 void ns_start_reading(int id)
 {
     pthread_mutex_lock(&mutex);
+    readerQueue++;
+    print_stats();
+    printf("\n");
 
     // wait if writers are in or waiting
     if (writersIn == 1 || writerQueue > 0)
@@ -324,6 +327,9 @@ void ns_stop_reading(int id)
 void ns_start_writing(int id)
 {
     pthread_mutex_lock(&mutex);
+    writerQueue++;
+    print_stats();
+    printf("\n");
 
     // wait if a writer is in or readers are waiting
     if (writersIn == 1 || readersIn > 0)
@@ -366,13 +372,19 @@ void *ns_reader(void* arg)
 {
     int id = *(int*)arg;
     int sleepTime = rand() % MAX_READ_TIME + 1;
-    sleep(1);
-    ns_start_reading(id);
+    while(1)
+    {
+        // simulate waiting before arrival
+        sleep(sleepTime);
+
+        ns_start_reading(id);
+
+        // simulate reading
+        sleep(sleepTime);
+
+        ns_stop_reading(id);
+    }
     
-    // simulate reading
-    sleep(sleepTime);
-    
-    ns_stop_reading(id);
 }
 
 // execute writing procedure
@@ -380,13 +392,18 @@ void *ns_writer(void* arg)
 {
     int id = *(int*)arg;
     int sleepTime = rand() % MAX_WRITE_TIME + 1;
-    sleep(1);
-    ns_start_writing(id);
+    while(1)
+    {
+        // simulate waiting before arrival
+        sleep(sleepTime);
 
-    // simulate writing
-    sleep(sleepTime);
+        ns_start_writing(id);
 
-    ns_stop_writing(id);
+        // simulate writing
+        sleep(sleepTime);
+
+        ns_stop_writing(id);
+    }
 }
 
 void no_starvation()
@@ -401,12 +418,16 @@ void no_starvation()
 
     ns_init();
 
+    readerQueue = 0;
+    writerQueue = 0;
+
     print_stats();
     printf("\n");
     fflush(stdout);
     readerIterator = 0;
     writerIterator = 0;
     i = 0;
+
 
     // create reader and writer threads
     while(readerIterator + writerIterator < totalCount)
