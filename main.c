@@ -32,7 +32,7 @@ void print_stats()
     fflush(stdout);
 }
 
-void print_change(int id, char name[], char action[])
+void print_change(int id, const char name[], const char action[])
 {
     printf("%s %-2d %s\n", name, id, action);
     fflush(stdout);
